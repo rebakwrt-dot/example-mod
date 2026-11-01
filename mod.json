@@ -1,35 +1,34 @@
-{
-	"geode": "5.0.0",
-	"gd": {
-		"win": "2.2081",
-		"android": "2.2081",
-		"mac": "2.2081",
-		"ios": "2.2081"
-	},
-	"version": "v1.0.0",
-	"id": "user.ai-builder",
-	"name": "AI Builder",
-	"developer": "user",
-	"description": "Создаёт объекты в редакторе по текстовому описанию (нейросеть через OpenAI-совместимый API или офлайн-режим) и вставляет их в начало уровня.",
-	"settings": {
-		"api-url": {
-			"type": "string",
-			"name": "API URL (пусто = офлайн-режим)",
-			"description": "Пусто = офлайн-режим (работает сразу). На телефоне: Groq https://api.groq.com/openai/v1/chat/completions или Ollama на ПК http://IP-ПК:11434/v1/chat/completions",
-			"default": ""
-		},
-		"api-key": {
-			"type": "string",
-			"name": "API ключ (необязателен)",
-			"description": "Не нужен для Ollama",
-			"default": ""
-		},
-		"model": {
-			"type": "string",
-			"name": "Модель",
-			"description": "Groq: llama-3.3-70b-versatile. Ollama: llama3.2",
-			"default": "llama-3.3-70b-versatile"
-		},
-		"start-x": {
-			"type": "int",
-			"name": "Начало (клетки по X)",
+    "version": "v1.0.0",
+    "id": "user.ai-builder",
+    "name": "AI Builder",
+    "developer": "user",
+    "description": "Builds objects in the editor from a text description (AI via OpenAI-compatible API, or offline mode) and inserts them at the start of the level.",
+    "settings": {
+        "api-url": {
+            "type": "string",
+            "name": "API URL (empty = offline mode)",
+            "description": "Empty = offline keyword mode. Groq: api.groq.com/openai/v1/chat/completions (add https before it)",
+            "default": ""
+        },
+        "api-key": {
+            "type": "string",
+            "name": "API key (optional)",
+            "description": "Not needed for offline mode or Ollama",
+            "default": ""
+        },
+        "model": {
+            "type": "string",
+            "name": "Model",
+            "description": "Groq: llama-3.3-70b-versatile. Ollama: llama3.2",
+            "default": "llama-3.3-70b-versatile"
+        },
+        "start-x": {
+            "type": "int",
+            "name": "Start offset (cells)",
+            "description": "Offset from the level start in cells (1 cell = 30 units)",
+            "default": 10,
+            "min": 0,
+            "max": 200
+        }
+    }
+}
