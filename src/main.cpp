@@ -84,17 +84,18 @@ static std::vector<Obj> parseObjects(std::string text) {
 }
 
 // ---------- popup ----------
-class AIPopup : public Popup<LevelEditorLayer*> {
+class AIPopup : public Popup {
 protected:
     LevelEditorLayer* m_lel = nullptr;
     TextInput* m_input = nullptr;
     CCMenuItemSpriteExtra* m_genBtn = nullptr;
-    EventListener<web::WebTask> m_listener;
+    async::TaskHolder<web::WebResponse> m_holder;
 
-    bool setup(LevelEditorLayer* lel) override {
+    bool init(LevelEditorLayer* lel) {
+        if (!Popup::init(340.f, 180.f)) return false;
         m_lel = lel;
         setTitle("AI Builder");
-        auto size = m_mainLayer->getContentSize();
+        auto size = m_size;
 
         m_input = TextInput::create(300.f, "Опиши, что построить...", "chatFont.fnt");
         m_input->setMaxCharCount(300);
@@ -157,30 +158,29 @@ protected:
         m_genBtn->setEnabled(false);
         Notification::create("Нейросеть думает...", NotificationIcon::Loading)->show();
 
-        m_listener.bind([this](web::WebTask::Event* e) {
-            if (auto res = e->getValue()) {
-                m_genBtn->setEnabled(true);
-                if (!res->ok()) {
-                    FLAlertLayer::create("AI Builder",
-                        "Ошибка запроса: " + std::to_string(res->code()) + ". Проверь URL, ключ и модель.", "OK")->show();
-                    return;
-                }
-                auto json = res->json();
-                if (!json) { FLAlertLayer::create("AI Builder", "Некорректный ответ сервера", "OK")->show(); return; }
-                auto j = json.unwrap();
-                auto text = j["choices"][0]["message"]["content"].asString().unwrapOr("");
-                place(parseObjects(text));
-            } else if (e->isCancelled()) {
-                m_genBtn->setEnabled(true);
+        m_holder.spawn(req.post(url), [this](web::WebResponse res) {
+            m_genBtn->setEnabled(true);
+            if (!res.ok()) {
+                std::string msg = "Ошибка запроса: " + std::to_string(res.code()) +
+                                  ". Проверь интернет, URL, ключ и название модели.";
+                FLAlertLayer::create("AI Builder", msg, "OK")->show();
+                return;
             }
+            auto json = res.json();
+            if (!json) {
+                FLAlertLayer::create("AI Builder", "Некорректный ответ сервера", "OK")->show();
+                return;
+            }
+            auto j = json.unwrap();
+            auto text = j["choices"][0]["message"]["content"].asString().unwrapOr("");
+            place(parseObjects(text));
         });
-        m_listener.setFilter(req.post(url));
     }
 
 public:
     static AIPopup* create(LevelEditorLayer* lel) {
         auto ret = new AIPopup();
-        if (ret->initAnchored(340.f, 180.f, lel)) {
+        if (ret->init(lel)) {
             ret->autorelease();
             return ret;
         }
