@@ -16,6 +16,13 @@ class $modify(ADLayer, PlayLayer) {
         }
     }
 
+    // Built-in 2-player mode: tap left half = P1, right half = P2.
+    void splitControls() {
+        if (!modOn()) return;
+        if (!Mod::get()->getSettingValue<bool>("split-controls")) return;
+        if (m_levelSettings) m_levelSettings->m_twoPlayerMode = true;
+    }
+
     void hideCeiling() {
         if (!Mod::get()->getSettingValue<bool>("hide-ceiling")) return;
         if (m_groundLayer2) m_groundLayer2->setVisible(false);
@@ -24,12 +31,14 @@ class $modify(ADLayer, PlayLayer) {
     void setupHasCompleted() {
         PlayLayer::setupHasCompleted();
         this->forceDual();
+        this->splitControls();
         this->hideCeiling();
     }
 
     void resetLevel() {
         PlayLayer::resetLevel();
         this->forceDual();
+        this->splitControls();
         this->hideCeiling();
     }
 
