@@ -15,21 +15,21 @@
 		"api-key": {
 			"type": "string",
 			"name": "API ключ",
-			"description": "Ключ API (Groq, OpenRouter и т.д.). Для офлайн-режима не нужен",
+			"description": "Ключ Anthropic API (sk-ant-...)",
 			"default": ""
 		},
 		"api-url": {
 			"type": "string",
 			"name": "API URL",
-			"description": "offline = встроенный режим без нейросети. Groq: https://api.groq.com/openai/v1/chat/completions",
-			"default": "offline"
+			"default": "https://api.anthropic.com/v1/messages"
 		},
 		"model": {
 			"type": "string",
 			"name": "Модель",
-			"default": "llama-3.3-70b-versatile"
+			"default": "claude-sonnet-4-6"
 		},
 		"start-x": {
 			"type": "int",
 			"name": "Начало (клетки по X)",
 			"description": "Смещение вставки от начала уровня в клетках (1 клетка = 30 юнитов)",
+			"default": 10,
