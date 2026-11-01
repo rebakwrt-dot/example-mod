@@ -7,6 +7,9 @@ static bool modOn() {
     return Mod::get()->getSettingValue<bool>("enabled");
 }
 
+static int g_frame = 0;
+static int g_lines = 0;
+
 class $modify(ADLayer, PlayLayer) {
     void forceDual() {
         if (!modOn()) return;
@@ -37,6 +40,8 @@ class $modify(ADLayer, PlayLayer) {
 
     void resetLevel() {
         PlayLayer::resetLevel();
+        g_frame = 0;
+        g_lines = 0;
         this->forceDual();
         this->splitControls();
         this->hideCeiling();
@@ -51,6 +56,20 @@ class $modify(ADLayer, PlayLayer) {
             }
         }
         this->hideCeiling();
+
+        // Diagnostic: where exactly are both players during the first seconds
+        if (modOn() && m_gameState.m_isDualMode && m_player1 && m_player2) {
+            g_frame++;
+            if (g_frame % 15 == 0 && g_lines < 14) {
+                g_lines++;
+                log::info(
+                    "[AlwaysDual] pos: P1=({:.1f},{:.1f}) up={} | P2=({:.1f},{:.1f}) up={} vis={}",
+                    m_player1->getPositionX(), m_player1->getPositionY(), m_player1->m_isUpsideDown,
+                    m_player2->getPositionX(), m_player2->getPositionY(), m_player2->m_isUpsideDown,
+                    m_player2->isVisible()
+                );
+            }
+        }
     }
 
     // Logs showed both players dying in the first frames after spawn
