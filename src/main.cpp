@@ -129,7 +129,7 @@ class $modify(AlwaysDualBaseLayer, GJBaseGameLayer) {
 	}
 	// Optionally block normal input, only injected custom-key input passes
 	void handleButton(bool down, int button, bool isPlayer1) {
-		if (on() && button == 1 && !g_inject && PlayLayer::get() == this &&
+		if (on() && button == 1 && !g_inject && static_cast<GJBaseGameLayer*>(PlayLayer::get()) == static_cast<GJBaseGameLayer*>(this) &&
 			Mod::get()->getSettingValue<bool>("only-custom-keys")) return;
 		GJBaseGameLayer::handleButton(down, button, isPlayer1);
 	}
