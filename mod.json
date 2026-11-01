@@ -1,32 +1,42 @@
 {
 	"geode": "5.11.2",
 	"gd": {
-		"android": "2.2081",
-		"win": "2.2081"
+		"win": "2.2074",
+		"android": "2.2074",
+		"mac": "2.2074",
+		"ios": "2.2074"
 	},
-	"id": "user.ghostreplay",
-	"name": "Ghost Replay",
 	"version": "v1.0.0",
+	"id": "user.ai-builder",
+	"name": "AI Builder",
 	"developer": "user",
-	"description": "После смерти на следующей попытке появляется призрак, который повторяет предыдущую (неудачную) попытку. Максимум один призрак на экране.",
-	"tags": ["gameplay", "enhancement"],
+	"description": "Создаёт объекты в редакторе по текстовому описанию (нейросеть через OpenAI-совместимый API или офлайн-режим) и вставляет их в начало уровня.",
 	"settings": {
-		"enabled": {
-			"type": "bool",
-			"name": "Включить призрака",
-			"default": true
+		"api-url": {
+			"type": "string",
+			"name": "API URL (пусто = офлайн-режим)",
+			"description": "OpenAI-совместимый адрес. Ollama: http://localhost:11434/v1/chat/completions. Groq: https://api.groq.com/openai/v1/chat/completions",
+			"default": "http://localhost:11434/v1/chat/completions"
 		},
-		"opacity": {
-			"type": "float",
-			"name": "Прозрачность призрака",
-			"default": 0.45,
-			"min": 0.1,
-			"max": 1.0
+		"api-key": {
+			"type": "string",
+			"name": "API ключ (необязателен)",
+			"description": "Не нужен для Ollama",
+			"default": ""
 		},
-		"ghost_color": {
-			"type": "color",
-			"name": "Цвет призрака",
-			"default": "#7FD4FF"
+		"model": {
+			"type": "string",
+			"name": "Модель",
+			"description": "Ollama: llama3.2. Groq: llama-3.3-70b-versatile",
+			"default": "llama3.2"
+		},
+		"start-x": {
+			"type": "int",
+			"name": "Начало (клетки по X)",
+			"description": "Смещение вставки от начала уровня в клетках (1 клетка = 30 юнитов)",
+			"default": 10,
+			"min": 0,
+			"max": 200
 		}
 	}
 }
