@@ -6,30 +6,9 @@
 		"mac": "2.2081",
 		"ios": "2.2081"
 	},
-	"version": "v1.0.0",
 	"id": "user.ai-builder",
 	"name": "AI Builder",
+	"version": "v1.0.0",
 	"developer": "user",
-	"description": "Создаёт объекты в редакторе по текстовому описанию с помощью нейросети и вставляет их в начало уровня.",
-	"settings": {
-		"api-key": {
-			"type": "string",
-			"name": "API ключ",
-			"description": "Ключ Anthropic API (sk-ant-...)",
-			"default": ""
-		},
-		"api-url": {
-			"type": "string",
-			"name": "API URL",
-			"default": "https://api.anthropic.com/v1/messages"
-		},
-		"model": {
-			"type": "string",
-			"name": "Модель",
-			"default": "claude-sonnet-4-6"
-		},
-		"start-x": {
-			"type": "int",
-			"name": "Начало (клетки по X)",
-			"description": "Смещение вставки от начала уровня в клетках (1 клетка = 30 юнитов)",
-			"default": 10,
+	"description": "Builds objects in the editor from a text description"
+}
