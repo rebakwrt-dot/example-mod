@@ -1,149 +1,211 @@
 #include <Geode/Geode.hpp>
-#include <Geode/modify/PlayLayer.hpp>
+#include <Geode/modify/EditorUI.hpp>
+#include <Geode/utils/web.hpp>
 #include <algorithm>
-#include <vector>
+#include <cctype>
 
 using namespace geode::prelude;
 
-// Один записанный кадр попытки.
-struct GhostFrame {
-    double t;      // время уровня (сек)
-    float x, y;    // позиция в objectLayer
-    float rot;     // поворот
-    float sx, sy;  // масштаб (мини / зеркало / гравитация)
-    IconType mode; // режим (куб, корабль, шар...)
+struct Obj {
+    int id = 1;
+    double x = 0, y = 0, rot = 0, scale = 1;
 };
 
-static IconType modeOf(PlayerObject* p) {
-    if (p->m_isShip) return IconType::Ship;
-    if (p->m_isBall) return IconType::Ball;
-    if (p->m_isBird) return IconType::Ufo;
-    if (p->m_isDart) return IconType::Wave;
-    if (p->m_isRobot) return IconType::Robot;
-    if (p->m_isSpider) return IconType::Spider;
-    if (p->m_isSwing) return IconType::Swing;
-    return IconType::Cube;
+static const char* SYSTEM_PROMPT =
+    "You are a Geometry Dash level builder. Convert the user's description into objects. "
+    "Reply ONLY with a JSON array, no text, no markdown. Each item: "
+    "{\"id\":int,\"x\":int,\"y\":int,\"rot\":number,\"scale\":number}. "
+    "x,y are grid cells (1 cell = 1 block), x>=0 from the left, y=0 is the ground row. "
+    "Allowed ids: 1=block, 8=spike, 39=small spike, 35=yellow pad, 36=yellow orb, "
+    "84=blue orb, 140=pink pad, 141=pink orb, 10=normal gravity portal, 11=flipped gravity portal, "
+    "12=cube portal, 13=ship portal. Spikes must sit on top of a block or the ground (rot 0). "
+    "Maximum 400 objects. Make the layout playable.";
+
+// ---------- offline generator (no AI, keyword based) ----------
+static bool has(std::string const& p, std::initializer_list<const char*> words) {
+    for (auto w : words) if (p.find(w) != std::string::npos) return true;
+    return false;
 }
 
-static void setOpacityRecursive(CCNode* node, GLubyte o) {
-    if (auto rgba = typeinfo_cast<CCRGBAProtocol*>(node)) rgba->setOpacity(o);
-    if (auto kids = node->getChildren()) {
-        for (auto kid : CCArrayExt<CCNode*>(kids)) setOpacityRecursive(kid, o);
+static std::vector<Obj> offlineGenerate(std::string p) {
+    std::transform(p.begin(), p.end(), p.begin(), [](unsigned char c) { return std::tolower(c); });
+    int n = 5;
+    for (size_t i = 0; i < p.size(); i++) {
+        if (std::isdigit((unsigned char)p[i])) { n = std::clamp(std::atoi(p.c_str() + i), 1, 60); break; }
     }
+    std::vector<Obj> out;
+    int cur = 0;
+    bool any = false;
+    if (has(p, {"лестниц", "Лестниц", "stair"})) {
+        any = true;
+        for (int i = 0; i < n; i++) out.push_back({1, double(cur + i), double(i), 0, 1});
+        cur += n + 2;
+    }
+    if (has(p, {"шип", "Шип", "spike"})) {
+        any = true;
+        for (int i = 0; i < n; i++) out.push_back({8, double(cur + i), 0, 0, 1});
+        cur += n + 2;
+    }
+    if (has(p, {"платформ", "Платформ", "platform"})) {
+        any = true;
+        for (int i = 0; i < n; i++) out.push_back({1, double(cur + i), 3, 0, 1});
+        cur += n + 2;
+    }
+    if (has(p, {"башн", "Башн", "tower"})) {
+        any = true;
+        for (int i = 0; i < n; i++) out.push_back({1, double(cur), double(i), 0, 1});
+        cur += 3;
+    }
+    if (!any) for (int i = 0; i < n; i++) out.push_back({1, double(i), 0, 0, 1});
+    return out;
 }
 
-class $modify(GhostPlayLayer, PlayLayer) {
-    struct Fields {
-        std::vector<GhostFrame> current;  // текущая попытка (запись)
-        std::vector<GhostFrame> ghostRun; // прошлая неудачная попытка (воспроизведение)
-        Ref<SimplePlayer> ghost;          // единственный призрак
-        bool died = false;
-        bool modeSet = false;
-        IconType shownMode = IconType::Cube;
-    };
+// ---------- parse LLM answer ----------
+static std::vector<Obj> parseObjects(std::string text) {
+    std::vector<Obj> out;
+    auto a = text.find('[');
+    auto b = text.rfind(']');
+    if (a == std::string::npos || b == std::string::npos || b < a) return out;
+    auto parsed = matjson::parse(text.substr(a, b - a + 1));
+    if (!parsed) return out;
+    auto arr = parsed.unwrap();
+    if (!arr.isArray()) return out;
+    for (size_t i = 0; i < arr.size() && out.size() < 500; i++) {
+        auto& it = arr[i];
+        Obj o;
+        o.id = (int)it["id"].asDouble().unwrapOr(0);
+        o.x = it["x"].asDouble().unwrapOr(0);
+        o.y = it["y"].asDouble().unwrapOr(0);
+        o.rot = it["rot"].asDouble().unwrapOr(0);
+        o.scale = it["scale"].asDouble().unwrapOr(1);
+        if (o.id > 0 && o.id < 2000) out.push_back(o);
+    }
+    return out;
+}
 
-    void ensureGhost() {
-        auto f = m_fields.self();
-        if (f->ghost || !m_objectLayer) return;
-        auto gm = GameManager::get();
-        f->ghost = SimplePlayer::create(gm->activeIconForType(IconType::Cube));
-        f->ghost->setVisible(false);
-        m_objectLayer->addChild(f->ghost, 1000);
+// ---------- popup ----------
+class AIPopup : public Popup<LevelEditorLayer*> {
+protected:
+    LevelEditorLayer* m_lel = nullptr;
+    TextInput* m_input = nullptr;
+    CCMenuItemSpriteExtra* m_genBtn = nullptr;
+    EventListener<web::WebTask> m_listener;
+
+    bool setup(LevelEditorLayer* lel) override {
+        m_lel = lel;
+        setTitle("AI Builder");
+        auto size = m_mainLayer->getContentSize();
+
+        m_input = TextInput::create(300.f, "Опиши, что построить...", "chatFont.fnt");
+        m_input->setMaxCharCount(300);
+        m_input->setPosition({size.width / 2, size.height / 2 + 15});
+        m_mainLayer->addChild(m_input);
+
+        auto spr = ButtonSprite::create("Создать");
+        m_genBtn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(AIPopup::onGenerate));
+        m_genBtn->setPosition({size.width / 2, 35});
+        m_buttonMenu->addChild(m_genBtn);
+        return true;
     }
 
-    void applyGhostLook(IconType mode) {
-        auto f = m_fields.self();
-        auto gm = GameManager::get();
-        f->ghost->updatePlayerFrame(gm->activeIconForType(mode), mode);
-        auto col = Mod::get()->getSettingValue<ccColor3B>("ghost_color");
-        f->ghost->setColor(col);
-        f->ghost->setSecondColor(col);
-        f->shownMode = mode;
-        f->modeSet = true;
-    }
-
-    void updateGhost(double t) {
-        auto f = m_fields.self();
-        auto& run = f->ghostRun;
-        if (run.empty() || t < run.front().t || t > run.back().t) {
-            if (f->ghost) f->ghost->setVisible(false);
+    void place(std::vector<Obj> const& objs) {
+        if (objs.empty()) {
+            FLAlertLayer::create("AI Builder", "Не удалось получить объекты. Попробуй описать иначе.", "OK")->show();
             return;
         }
-        ensureGhost();
-        if (!f->ghost) return;
-
-        auto it = std::upper_bound(run.begin(), run.end(), t,
-            [](double v, GhostFrame const& fr) { return v < fr.t; });
-        auto const& b = (it == run.end()) ? run.back() : *it;
-        auto const& a = (it == run.begin()) ? *it : *(it - 1);
-
-        float k = 0.f;
-        if (b.t > a.t) k = static_cast<float>((t - a.t) / (b.t - a.t));
-
-        if (!f->modeSet || f->shownMode != a.mode) applyGhostLook(a.mode);
-
-        f->ghost->setPosition({a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k});
-        f->ghost->setRotation(a.rot);
-        f->ghost->setScaleX(a.sx);
-        f->ghost->setScaleY(a.sy);
-        f->ghost->setVisible(true);
-
-        auto op = Mod::get()->getSettingValue<double>("opacity");
-        setOpacityRecursive(f->ghost, static_cast<GLubyte>(std::clamp(op, 0.0, 1.0) * 255.0));
+        double startX = Mod::get()->getSettingValue<int64_t>("start-x");
+        int count = 0;
+        for (auto const& o : objs) {
+            // клетка (gx, gy) -> координаты центра объекта
+            CCPoint pos{float((startX + o.x) * 30.0 + 15.0), float(o.y * 30.0 + 15.0)};
+            auto obj = m_lel->createObject(o.id, pos, true);
+            if (!obj) continue;
+            if (o.rot != 0) obj->setRotation((float)o.rot);
+            if (o.scale != 1 && o.scale > 0) obj->setScale((float)o.scale);
+            count++;
+        }
+        Notification::create("Создано объектов: " + std::to_string(count), NotificationIcon::Success)->show();
+        this->onClose(nullptr);
     }
 
-    void postUpdate(float dt) {
-        PlayLayer::postUpdate(dt);
+    void onGenerate(CCObject*) {
+        std::string prompt = m_input->getString();
+        if (prompt.empty()) return;
 
-        auto f = m_fields.self();
-        if (!Mod::get()->getSettingValue<bool>("enabled") || m_isPracticeMode) {
-            if (f->ghost) f->ghost->setVisible(false);
+        auto url = Mod::get()->getSettingValue<std::string>("api-url");
+        if (url.empty()) {
+            place(offlineGenerate(prompt));
             return;
         }
-        if (!m_player1) return;
+        auto key = Mod::get()->getSettingValue<std::string>("api-key");
+        auto model = Mod::get()->getSettingValue<std::string>("model");
 
-        double t = m_gameState.m_levelTime;
+        matjson::Value body = matjson::makeObject({
+            {"model", model},
+            {"temperature", 0.3},
+            {"messages", std::vector<matjson::Value>{
+                matjson::makeObject({{"role", "system"}, {"content", std::string(SYSTEM_PROMPT)}}),
+                matjson::makeObject({{"role", "user"}, {"content", prompt}})
+            }}
+        });
 
-        // Запись текущей попытки
-        if (!m_player1->m_isDead && (f->current.empty() || t > f->current.back().t)) {
-            auto mode = modeOf(m_player1);
-            float sy = m_player1->getScaleY();
-            if (m_player1->m_isUpsideDown &&
-                (mode == IconType::Ship || mode == IconType::Ufo || mode == IconType::Swing)) {
-                sy = -sy;
+        web::WebRequest req;
+        if (!key.empty()) req.header("Authorization", "Bearer " + key);
+        req.timeout(std::chrono::seconds(120));
+        req.bodyJSON(body);
+
+        m_genBtn->setEnabled(false);
+        Notification::create("Нейросеть думает...", NotificationIcon::Loading)->show();
+
+        m_listener.bind([this](web::WebTask::Event* e) {
+            if (auto res = e->getValue()) {
+                m_genBtn->setEnabled(true);
+                if (!res->ok()) {
+                    FLAlertLayer::create("AI Builder",
+                        "Ошибка запроса: " + std::to_string(res->code()) + ". Проверь URL, ключ и модель.", "OK")->show();
+                    return;
+                }
+                auto json = res->json();
+                if (!json) { FLAlertLayer::create("AI Builder", "Некорректный ответ сервера", "OK")->show(); return; }
+                auto j = json.unwrap();
+                auto text = j["choices"][0]["message"]["content"].asString().unwrapOr("");
+                place(parseObjects(text));
+            } else if (e->isCancelled()) {
+                m_genBtn->setEnabled(true);
             }
-            f->current.push_back({
-                t,
-                m_player1->getPositionX(), m_player1->getPositionY(),
-                m_player1->getRotation(),
-                m_player1->getScaleX(), sy,
-                mode
-            });
-        }
-
-        // Воспроизведение призрака
-        updateGhost(t);
+        });
+        m_listener.setFilter(req.post(url));
     }
 
-    void destroyPlayer(PlayerObject* player, GameObject* object) {
-        PlayLayer::destroyPlayer(player, object);
-        if (player == m_player1 && m_player1->m_isDead && !m_isPracticeMode) {
-            m_fields->died = true;
+public:
+    static AIPopup* create(LevelEditorLayer* lel) {
+        auto ret = new AIPopup();
+        if (ret->initAnchored(340.f, 180.f, lel)) {
+            ret->autorelease();
+            return ret;
         }
+        delete ret;
+        return nullptr;
+    }
+};
+
+// ---------- editor button ----------
+class $modify(AIEditorUI, EditorUI) {
+    bool init(LevelEditorLayer* lel) {
+        if (!EditorUI::init(lel)) return false;
+
+        auto winSize = CCDirector::get()->getWinSize();
+        auto menu = CCMenu::create();
+        menu->setPosition({40.f, winSize.height - 110.f});
+
+        auto spr = ButtonSprite::create("AI", "goldFont.fnt", "GJ_button_04.png", .8f);
+        auto btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(AIEditorUI::onAI));
+        menu->addChild(btn);
+        this->addChild(menu, 100);
+        return true;
     }
 
-    void resetLevel() {
-        auto f = m_fields.self();
-        // Если прошлая попытка закончилась смертью — она становится призраком.
-        // Старый призрак заменяется (всегда максимум один).
-        if (f->died && f->current.size() > 2) {
-            f->ghostRun = std::move(f->current);
-        }
-        f->current.clear();
-        f->died = false;
-
-        PlayLayer::resetLevel();
-
-        if (f->ghost) f->ghost->setVisible(false);
+    void onAI(CCObject*) {
+        if (auto p = AIPopup::create(m_editorLayer)) p->show();
     }
 };
