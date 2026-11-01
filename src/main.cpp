@@ -81,6 +81,12 @@ class $modify(BotLayer, PlayLayer) {
         int subs = 4;
         float subDt = 1.f / 240.f;
 
+        // отладка
+        int dbgTicks = 0, dbgReplans = 0, dbgPresses = 0, dbgT = -1, dbgN = 0;
+        float dbgBaseDx = 0.f, dbgRestoreErr = 0.f, dbgStartX = 0.f, dbgEndX = 0.f;
+        std::string dbgSkip;
+        Ref<CCLabelBMFont> dbgLabel;
+
         ~Fields() {
             if (g_ghost && g_ghost == ghost.data()) g_ghost = nullptr;
         }
@@ -185,6 +191,10 @@ class $modify(BotLayer, PlayLayer) {
         g_simDead = false;
         this->checkCollisions(g, f->subDt, false);
         g_simDead = false;
+        g->m_isDead = false;
+        f->dbgStartX = g->getPositionX();
+        f->dbgEndX = f->dbgStartX;
+        f->dbgRestoreErr = std::hypot(g->getPositionX() - s.pos.x, g->getPositionY() - s.pos.y);
     }
 
     // Прогоняет призрака n кадров из снимка s. Возвращает, сколько кадров он прожил (n = выжил).
@@ -210,7 +220,8 @@ class $modify(BotLayer, PlayLayer) {
             for (int k = 0; k < f->subs; ++k) {
                 g->update(f->subDt);
                 this->checkCollisions(g, f->subDt, false);
-                if (g_simDead) return i;
+                f->dbgEndX = g->getPositionX();
+                if (g_simDead || g->m_isDead) return i;
             }
             f->budget -= f->subs;
             if (g->getPositionX() >= f->barrierX) return n;
@@ -228,6 +239,11 @@ class $modify(BotLayer, PlayLayer) {
         std::vector<Snap> rec;
         int T = this->botRun(s0, cur, n, [base](int) { return base; }, &rec);
         out.assign(n, base ? 1 : 0);
+        if (depth == 2) {
+            f->dbgT = T;
+            f->dbgN = n;
+            f->dbgBaseDx = f->dbgEndX - f->dbgStartX;
+        }
         if (T >= n || depth <= 0) {
             f->used = mark;
             return T;
@@ -296,6 +312,7 @@ class $modify(BotLayer, PlayLayer) {
     void botReplan(int horizon) {
         auto f = m_fields.self();
         this->botEnsureGhost();
+        f->dbgReplans++;
         f->used = 0;
         f->budget = (int)Mod::get()->getSettingValue<int64_t>("max_steps");
         this->botBuildWindow(horizon);
@@ -316,12 +333,42 @@ class $modify(BotLayer, PlayLayer) {
         f->used = 0;
     }
 
-    void botTick(float dt) {
-        if (!Mod::get()->getSettingValue<bool>("enabled")) return;
-        if (!m_player1 || m_player1->m_isDead) return;
-        if (m_level && m_level->isPlatformer()) return;
-
+    void botUpdateLabel() {
         auto f = m_fields.self();
+        if (!Mod::get()->getSettingValue<bool>("debug")) {
+            if (f->dbgLabel) f->dbgLabel->setVisible(false);
+            return;
+        }
+        if (!f->dbgLabel) {
+            f->dbgLabel = CCLabelBMFont::create("", "chatFont.fnt");
+            f->dbgLabel->setAnchorPoint({0.f, 1.f});
+            f->dbgLabel->setScale(0.5f);
+            auto ws = CCDirector::get()->getWinSize();
+            f->dbgLabel->setPosition({5.f, ws.height - 5.f});
+            this->addChild(f->dbgLabel, 9999);
+        }
+        f->dbgLabel->setVisible(true);
+        std::string txt = fmt::format(
+            "tick {} replan {} press {}\nT {}/{} dx {:.0f} rerr {:.1f}\nbarrier {} skip {}",
+            f->dbgTicks, f->dbgReplans, f->dbgPresses, f->dbgT, f->dbgN, f->dbgBaseDx,
+            f->dbgRestoreErr, f->barrierX > 1e8f ? -1.f : f->barrierX, f->dbgSkip);
+        f->dbgLabel->setString(txt.c_str());
+    }
+
+    void botTick(float dt) {
+        auto f = m_fields.self();
+        f->dbgTicks++;
+        f->dbgSkip.clear();
+        this->botTickInner(dt);
+        if (f->dbgTicks % 5 == 0) this->botUpdateLabel();
+    }
+
+    void botTickInner(float dt) {
+        auto f = m_fields.self();
+        if (!Mod::get()->getSettingValue<bool>("enabled")) { f->dbgSkip = "off"; return; }
+        if (!m_player1 || m_player1->m_isDead) { f->dbgSkip = "dead"; return; }
+        if (m_level && m_level->isPlatformer()) { f->dbgSkip = "platformer"; return; }
+
         if (!f->cacheBuilt) this->botBuildCache();
 
         int H = (int)Mod::get()->getSettingValue<int64_t>("horizon");
@@ -342,6 +389,7 @@ class $modify(BotLayer, PlayLayer) {
             bool want = f->plan[f->planPos++] != 0;
             if (want != f->holding) {
                 f->holding = want;
+                f->dbgPresses++;
                 this->handleButton(want, 1, true);
             }
         }
