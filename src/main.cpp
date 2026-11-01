@@ -52,6 +52,15 @@ namespace {
         }
     }
 
+    // Скорость вперёд в юнитах/сек для множителя m_playerSpeed (0.7/0.9/1.1/1.3/1.6).
+    float speedUnits(float m) {
+        if (m < 0.8f) return 251.16f;
+        if (m < 1.0f) return 311.58f;
+        if (m < 1.2f) return 387.42f;
+        if (m < 1.45f) return 468.0f;
+        return 576.0f;
+    }
+
     struct Snap {
         PlayerCheckpoint* cp = nullptr;
         CCPoint pos;
@@ -83,7 +92,7 @@ class $modify(BotLayer, PlayLayer) {
 
         // отладка
         int dbgTicks = 0, dbgReplans = 0, dbgPresses = 0, dbgT = -1, dbgN = 0;
-        float dbgBaseDx = 0.f, dbgRestoreErr = 0.f, dbgStartX = 0.f, dbgEndX = 0.f;
+        float dbgBaseDx = 0.f, dbgRestoreErr = 0.f, dbgStartX = 0.f, dbgEndX = 0.f, dbgEndY = 0.f, dbgSpeed = 0.f;
         std::string dbgSkip;
         Ref<CCLabelBMFont> dbgLabel;
 
@@ -194,6 +203,8 @@ class $modify(BotLayer, PlayLayer) {
         g->m_isDead = false;
         f->dbgStartX = g->getPositionX();
         f->dbgEndX = f->dbgStartX;
+        f->dbgEndY = g->getPositionY();
+        f->dbgSpeed = g->m_playerSpeed;
         f->dbgRestoreErr = std::hypot(g->getPositionX() - s.pos.x, g->getPositionY() - s.pos.y);
     }
 
@@ -218,9 +229,16 @@ class $modify(BotLayer, PlayLayer) {
             }
             g_simDead = false;
             for (int k = 0; k < f->subs; ++k) {
+                float x0 = g->getPositionX();
                 g->update(f->subDt);
+                // Если update не двигает призрака вперёд — двигаем сами.
+                float expect = speedUnits(g->m_playerSpeed) * f->subDt;
+                if (g->getPositionX() - x0 < expect * 0.5f) {
+                    g->setPosition(ccp(x0 + expect, g->getPositionY()));
+                }
                 this->checkCollisions(g, f->subDt, false);
                 f->dbgEndX = g->getPositionX();
+                f->dbgEndY = g->getPositionY();
                 if (g_simDead || g->m_isDead) return i;
             }
             f->budget -= f->subs;
@@ -349,9 +367,9 @@ class $modify(BotLayer, PlayLayer) {
         }
         f->dbgLabel->setVisible(true);
         std::string txt = fmt::format(
-            "tick {} replan {} press {}\nT {}/{} dx {:.0f} rerr {:.1f}\nbarrier {} skip {}",
+            "tick {} replan {} press {}\nT {}/{} dx {:.0f} rerr {:.1f} spd {:.2f}\nbarrier {} skip {}",
             f->dbgTicks, f->dbgReplans, f->dbgPresses, f->dbgT, f->dbgN, f->dbgBaseDx,
-            f->dbgRestoreErr, f->barrierX > 1e8f ? -1.f : f->barrierX, f->dbgSkip);
+            f->dbgRestoreErr, f->dbgSpeed, f->barrierX > 1e8f ? -1.f : f->barrierX, f->dbgSkip);
         f->dbgLabel->setString(txt.c_str());
     }
 
