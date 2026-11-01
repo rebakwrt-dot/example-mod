@@ -11,12 +11,13 @@ static int g_frame = 0;
 static int g_lines = 0;
 
 class $modify(ADLayer, PlayLayer) {
+    // Use the game's own "Start Dual" level flag. The game then sets up
+    // P2 AND the ground/ceiling correctly during its normal level reset
+    // (calling toggleDualMode by hand broke the ground).
     void forceDual() {
         if (!modOn()) return;
         if (m_level->isPlatformer()) return;
-        if (!m_gameState.m_isDualMode) {
-            this->toggleDualMode(nullptr, true, m_player1, true);
-        }
+        if (m_levelSettings) m_levelSettings->m_startDual = true;
     }
 
     // Built-in 2-player mode: tap left half = P1, right half = P2.
@@ -32,17 +33,17 @@ class $modify(ADLayer, PlayLayer) {
     }
 
     void setupHasCompleted() {
-        PlayLayer::setupHasCompleted();
         this->forceDual();
+        PlayLayer::setupHasCompleted();
         this->splitControls();
         this->hideCeiling();
     }
 
     void resetLevel() {
+        this->forceDual();
         PlayLayer::resetLevel();
         g_frame = 0;
         g_lines = 0;
-        this->forceDual();
         this->splitControls();
         this->hideCeiling();
     }
