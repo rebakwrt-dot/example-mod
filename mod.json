@@ -6,109 +6,23 @@
 		"mac": "2.2081",
 		"ios": "2.2081"
 	},
-	"version": "v1.0.0",
+	"version": "v1.1.0",
 	"id": "yourname.always-dual",
 	"name": "Always Dual",
 	"developer": "yourname",
-	"description": "Splits you into two players in every level. Custom icons, colors and jump keys for each player.",
-	"tags": ["gameplay", "customization", "utility"],
+	"description": "Always starts every level in dual mode. Both players use your selected icons, all game modes work.",
+	"tags": ["gameplay", "utility"],
 	"settings": {
 		"enabled": {
 			"type": "bool",
 			"name": "Enable Always Dual",
-			"description": "Player 2 is always present, in every level.",
 			"default": true
 		},
-		"only-custom-keys": {
+		"hide-ceiling": {
 			"type": "bool",
-			"name": "Only Use Custom Jump Keys",
-			"description": "Ignore normal clicks/keys and only jump with the keys set below.",
+			"name": "Remove Dual Ceiling",
+			"description": "Hides the extra ceiling that appears in dual mode.",
 			"default": true
-		},
-		"link-title": {
-			"type": "title",
-			"name": "Link"
-		},
-		"p2-offset": {
-			"type": "int",
-			"name": "Player 2 Lead Distance",
-			"description": "How far Player 2 is ahead of Player 1 (30 = 1 block). Both run on the same lane.",
-			"default": 90,
-			"min": 15,
-			"max": 300,
-			"control": { "slider": true }
-		},
-		"show-link": {
-			"type": "bool",
-			"name": "Show Link",
-			"description": "Draws a deadly chain between the players. If one dies, both die.",
-			"default": true
-		},
-		"link-color": {
-			"type": "rgb",
-			"name": "Link Color",
-			"default": [255, 60, 60]
-		},
-		"link-thickness": {
-			"type": "int",
-			"name": "Link Thickness",
-			"default": 2,
-			"min": 1,
-			"max": 8
-		},
-		"controls-title": {
-			"type": "title",
-			"name": "Controls"
-		},
-		"p1-key": {
-			"type": "string",
-			"name": "Player 1 Jump Key",
-			"default": "W",
-			"one-of": ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","Up","Down","Left","Right","Space","Shift","Ctrl","Enter","Tab"]
-		},
-		"p2-key": {
-			"type": "string",
-			"name": "Player 2 Jump Key",
-			"default": "Up",
-			"one-of": ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","Up","Down","Left","Right","Space","Shift","Ctrl","Enter","Tab"]
-		},
-		"p1-title": {
-			"type": "title",
-			"name": "Player 1 Look"
-		},
-		"p1-override": {
-			"type": "bool",
-			"name": "Override Player 1 Look",
-			"description": "If off, Player 1 uses your normal in-game icons and colors.",
-			"default": false
-		},
-		"p1-cube": { "type": "int", "name": "Cube Icon ID", "default": 1, "min": 1, "max": 600 },
-		"p1-ship": { "type": "int", "name": "Ship Icon ID", "default": 1, "min": 1, "max": 200 },
-		"p1-ball": { "type": "int", "name": "Ball Icon ID", "default": 1, "min": 1, "max": 200 },
-		"p1-ufo": { "type": "int", "name": "UFO Icon ID", "default": 1, "min": 1, "max": 200 },
-		"p1-wave": { "type": "int", "name": "Wave Icon ID", "default": 1, "min": 1, "max": 200 },
-		"p1-robot": { "type": "int", "name": "Robot Icon ID", "default": 1, "min": 1, "max": 100 },
-		"p1-spider": { "type": "int", "name": "Spider Icon ID", "default": 1, "min": 1, "max": 100 },
-		"p1-swing": { "type": "int", "name": "Swing Icon ID", "default": 1, "min": 1, "max": 100 },
-		"p1-color1": { "type": "rgb", "name": "Primary Color", "default": [0, 255, 0] },
-		"p1-color2": { "type": "rgb", "name": "Secondary Color", "default": [0, 255, 255] },
-		"p1-glow-on": { "type": "bool", "name": "Glow", "default": false },
-		"p1-glow": { "type": "rgb", "name": "Glow Color", "default": [255, 255, 255] },
-		"p2-title": {
-			"type": "title",
-			"name": "Player 2 Look"
-		},
-		"p2-cube": { "type": "int", "name": "Cube Icon ID", "default": 2, "min": 1, "max": 600 },
-		"p2-ship": { "type": "int", "name": "Ship Icon ID", "default": 2, "min": 1, "max": 200 },
-		"p2-ball": { "type": "int", "name": "Ball Icon ID", "default": 2, "min": 1, "max": 200 },
-		"p2-ufo": { "type": "int", "name": "UFO Icon ID", "default": 2, "min": 1, "max": 200 },
-		"p2-wave": { "type": "int", "name": "Wave Icon ID", "default": 2, "min": 1, "max": 200 },
-		"p2-robot": { "type": "int", "name": "Robot Icon ID", "default": 2, "min": 1, "max": 100 },
-		"p2-spider": { "type": "int", "name": "Spider Icon ID", "default": 2, "min": 1, "max": 100 },
-		"p2-swing": { "type": "int", "name": "Swing Icon ID", "default": 2, "min": 1, "max": 100 },
-		"p2-color1": { "type": "rgb", "name": "Primary Color", "default": [255, 0, 0] },
-		"p2-color2": { "type": "rgb", "name": "Secondary Color", "default": [255, 128, 0] },
-		"p2-glow-on": { "type": "bool", "name": "Glow", "default": false },
-		"p2-glow": { "type": "rgb", "name": "Glow Color", "default": [255, 255, 255] }
+		}
 	}
 }
