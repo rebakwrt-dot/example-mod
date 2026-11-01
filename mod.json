@@ -1,10 +1,10 @@
 {
-	"geode": "5.11.2",
+	"geode": "5.0.0",
 	"gd": {
-		"win": "2.2074",
-		"android": "2.2074",
-		"mac": "2.2074",
-		"ios": "2.2074"
+		"win": "2.2081",
+		"android": "2.2081",
+		"mac": "2.2081",
+		"ios": "2.2081"
 	},
 	"version": "v1.0.0",
 	"id": "user.ai-builder",
@@ -15,8 +15,8 @@
 		"api-url": {
 			"type": "string",
 			"name": "API URL (пусто = офлайн-режим)",
-			"description": "OpenAI-совместимый адрес. Ollama: http://localhost:11434/v1/chat/completions. Groq: https://api.groq.com/openai/v1/chat/completions",
-			"default": "http://localhost:11434/v1/chat/completions"
+			"description": "Пусто = офлайн-режим (работает сразу). На телефоне: Groq https://api.groq.com/openai/v1/chat/completions или Ollama на ПК http://IP-ПК:11434/v1/chat/completions",
+			"default": ""
 		},
 		"api-key": {
 			"type": "string",
@@ -27,16 +27,9 @@
 		"model": {
 			"type": "string",
 			"name": "Модель",
-			"description": "Ollama: llama3.2. Groq: llama-3.3-70b-versatile",
-			"default": "llama3.2"
+			"description": "Groq: llama-3.3-70b-versatile. Ollama: llama3.2",
+			"default": "llama-3.3-70b-versatile"
 		},
 		"start-x": {
 			"type": "int",
 			"name": "Начало (клетки по X)",
-			"description": "Смещение вставки от начала уровня в клетках (1 клетка = 30 юнитов)",
-			"default": 10,
-			"min": 0,
-			"max": 200
-		}
-	}
-}
