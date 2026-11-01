@@ -83,6 +83,63 @@ static std::vector<Obj> parseObjects(std::string text) {
     return out;
 }
 
+// ---------- settings popup ----------
+class AISettingsPopup : public Popup {
+protected:
+    TextInput* m_url = nullptr;
+    TextInput* m_key = nullptr;
+    TextInput* m_model = nullptr;
+    TextInput* m_startX = nullptr;
+
+    TextInput* makeInput(char const* hint, float y, std::string const& value, bool pass) {
+        auto in = TextInput::create(300.f, hint, "chatFont.fnt");
+        in->setPosition({m_size.width / 2, y});
+        in->setString(value);
+        if (pass) in->setPasswordMode(true);
+        m_mainLayer->addChild(in);
+        return in;
+    }
+
+    bool init() {
+        if (!Popup::init(340.f, 260.f)) return false;
+        setTitle("AI Builder settings");
+        auto mod = Mod::get();
+        float h = m_size.height;
+        m_url = makeInput("API URL (offline = no AI)", h - 65, mod->getSavedValue<std::string>("api-url", "offline"), false);
+        m_key = makeInput("API key (optional)", h - 105, mod->getSavedValue<std::string>("api-key", ""), true);
+        m_model = makeInput("Model", h - 145, mod->getSavedValue<std::string>("model", "llama-3.3-70b-versatile"), false);
+        m_startX = makeInput("Start offset (cells)", h - 185, std::to_string(mod->getSavedValue<int64_t>("start-x", 10)), false);
+
+        auto spr = ButtonSprite::create("Save", "goldFont.fnt", "GJ_button_01.png", .8f);
+        auto btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(AISettingsPopup::onSave));
+        btn->setPosition({m_size.width / 2, 30.f});
+        m_buttonMenu->addChild(btn);
+        return true;
+    }
+
+    void onSave(CCObject*) {
+        auto mod = Mod::get();
+        mod->setSavedValue<std::string>("api-url", m_url->getString());
+        mod->setSavedValue<std::string>("api-key", m_key->getString());
+        mod->setSavedValue<std::string>("model", m_model->getString());
+        int64_t x = std::clamp(std::atoi(m_startX->getString().c_str()), 0, 200);
+        mod->setSavedValue<int64_t>("start-x", x);
+        Notification::create("Saved", NotificationIcon::Success)->show();
+        this->onClose(nullptr);
+    }
+
+public:
+    static AISettingsPopup* create() {
+        auto ret = new AISettingsPopup();
+        if (ret->init()) {
+            ret->autorelease();
+            return ret;
+        }
+        delete ret;
+        return nullptr;
+    }
+};
+
 // ---------- popup ----------
 class AIPopup : public Popup {
 protected:
@@ -97,24 +154,29 @@ protected:
         setTitle("AI Builder");
         auto size = m_size;
 
-        m_input = TextInput::create(300.f, "Опиши, что построить...", "chatFont.fnt");
+        m_input = TextInput::create(300.f, "Describe what to build...", "chatFont.fnt");
         m_input->setMaxCharCount(300);
         m_input->setPosition({size.width / 2, size.height / 2 + 15});
         m_mainLayer->addChild(m_input);
 
-        auto spr = ButtonSprite::create("Создать");
+        auto spr = ButtonSprite::create("Create", "goldFont.fnt", "GJ_button_01.png", .8f);
         m_genBtn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(AIPopup::onGenerate));
-        m_genBtn->setPosition({size.width / 2, 35});
+        m_genBtn->setPosition({size.width / 2 + 70, 35});
         m_buttonMenu->addChild(m_genBtn);
+
+        auto setSpr = ButtonSprite::create("Settings", "goldFont.fnt", "GJ_button_04.png", .8f);
+        auto setBtn = CCMenuItemSpriteExtra::create(setSpr, this, menu_selector(AIPopup::onSettings));
+        setBtn->setPosition({size.width / 2 - 70, 35});
+        m_buttonMenu->addChild(setBtn);
         return true;
     }
 
     void place(std::vector<Obj> const& objs) {
         if (objs.empty()) {
-            FLAlertLayer::create("AI Builder", "Не удалось получить объекты. Попробуй описать иначе.", "OK")->show();
+            FLAlertLayer::create("AI Builder", "No objects were produced. Try describing it differently.", "OK")->show();
             return;
         }
-        double startX = Mod::get()->getSettingValue<int64_t>("start-x");
+        double startX = (double)Mod::get()->getSavedValue<int64_t>("start-x", 10);
         int count = 0;
         for (auto const& o : objs) {
             // клетка (gx, gy) -> координаты центра объекта
@@ -125,21 +187,25 @@ protected:
             if (o.scale != 1 && o.scale > 0) obj->setScale((float)o.scale);
             count++;
         }
-        Notification::create("Создано объектов: " + std::to_string(count), NotificationIcon::Success)->show();
+        Notification::create("Objects created: " + std::to_string(count), NotificationIcon::Success)->show();
         this->onClose(nullptr);
+    }
+
+    void onSettings(CCObject*) {
+        if (auto p = AISettingsPopup::create()) p->show();
     }
 
     void onGenerate(CCObject*) {
         std::string prompt = m_input->getString();
         if (prompt.empty()) return;
 
-        auto url = Mod::get()->getSettingValue<std::string>("api-url");
+        auto url = Mod::get()->getSavedValue<std::string>("api-url", "offline");
         if (url.empty() || url == "offline") {
             place(offlineGenerate(prompt));
             return;
         }
-        auto key = Mod::get()->getSettingValue<std::string>("api-key");
-        auto model = Mod::get()->getSettingValue<std::string>("model");
+        auto key = Mod::get()->getSavedValue<std::string>("api-key", "");
+        auto model = Mod::get()->getSavedValue<std::string>("model", "llama-3.3-70b-versatile");
 
         matjson::Value body = matjson::makeObject({
             {"model", model},
@@ -156,19 +222,19 @@ protected:
         req.bodyJSON(body);
 
         m_genBtn->setEnabled(false);
-        Notification::create("Нейросеть думает...", NotificationIcon::Loading)->show();
+        Notification::create("AI is thinking...", NotificationIcon::Loading)->show();
 
         m_holder.spawn(req.post(url), [this](web::WebResponse res) {
             m_genBtn->setEnabled(true);
             if (!res.ok()) {
-                std::string msg = "Ошибка запроса: " + std::to_string(res.code()) +
-                                  ". Проверь интернет, URL, ключ и название модели.";
+                std::string msg = "Request failed: " + std::to_string(res.code()) +
+                                  ". Check internet, URL, key and model name.";
                 FLAlertLayer::create("AI Builder", msg, "OK")->show();
                 return;
             }
             auto json = res.json();
             if (!json) {
-                FLAlertLayer::create("AI Builder", "Некорректный ответ сервера", "OK")->show();
+                FLAlertLayer::create("AI Builder", "Invalid server response", "OK")->show();
                 return;
             }
             auto j = json.unwrap();
