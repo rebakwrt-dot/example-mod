@@ -1,37 +1,11 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
-#include <Geode/modify/GJBaseGameLayer.hpp>
 
 using namespace geode::prelude;
 
-static bool modOn() { return Mod::get()->getSettingValue<bool>("enabled"); }
-
-// P2 is placed one frame AFTER dual is enabled, so the game has
-// finished its own setup of P2 first.
-static bool g_placeP2 = false;
-
-static void syncP2(GJBaseGameLayer* layer, bool place) {
-    auto p1 = layer->m_player1;
-    auto p2 = layer->m_player2;
-    if (!p1 || !p2) return;
-
-    if (p1->m_isUpsideDown != p2->m_isUpsideDown) {
-        p2->flipGravity(p1->m_isUpsideDown, true);
-    }
-    if (place) {
-        auto pos = p1->getPosition();
-        float off = static_cast<float>(Mod::get()->getSettingValue<int64_t>("p2-offset"));
-        p2->setPosition({pos.x + off, pos.y});
-        p2->m_yVelocity = 0;
-    }
+static bool modOn() {
+    return Mod::get()->getSettingValue<bool>("enabled");
 }
-
-class $modify(ADBase, GJBaseGameLayer) {
-    void toggleDualMode(GameObject* portal, bool enable, PlayerObject* player, bool noEffects) {
-        GJBaseGameLayer::toggleDualMode(portal, enable, player, noEffects);
-        if (enable && modOn()) g_placeP2 = true;
-    }
-};
 
 class $modify(ADLayer, PlayLayer) {
     void forceDual() {
@@ -42,31 +16,40 @@ class $modify(ADLayer, PlayLayer) {
         }
     }
 
+    void hideCeiling() {
+        if (!Mod::get()->getSettingValue<bool>("hide-ceiling")) return;
+        if (m_groundLayer2) m_groundLayer2->setVisible(false);
+    }
+
     void setupHasCompleted() {
         PlayLayer::setupHasCompleted();
         this->forceDual();
+        this->hideCeiling();
     }
 
     void resetLevel() {
         PlayLayer::resetLevel();
         this->forceDual();
+        this->hideCeiling();
     }
 
     void postUpdate(float dt) {
         PlayLayer::postUpdate(dt);
-        if (modOn() && m_gameState.m_isDualMode) {
-            syncP2(this, g_placeP2);
-            g_placeP2 = false;
+        if (modOn() && m_gameState.m_isDualMode && m_player1 && m_player2) {
+            // P2 always keeps the same gravity as P1 (same lane, not mirrored)
+            if (m_player1->m_isUpsideDown != m_player2->m_isUpsideDown) {
+                m_player2->flipGravity(m_player1->m_isUpsideDown, true);
+            }
         }
+        this->hideCeiling();
     }
 
-    // The game keeps a hidden "anti-cheat" spike (object id 8) at (0, 105).
-    // At level start both players overlap it, so it kills them instantly.
-    // Ignore only that spike; everything else works as normal.
+    // Logs showed both players dying in the first frames after spawn
+    // (x < 20) from a hidden spike (id 8) or from "no object".
+    // No real level object can be there, so ignore deaths at the very start.
     void destroyPlayer(PlayerObject* player, GameObject* object) {
-        if (modOn() && object && object->m_objectID == 8 &&
-            object->getPositionX() < 1.f &&
-            std::abs(object->getPositionY() - 105.f) < 1.f) {
+        if (modOn() && m_gameState.m_isDualMode && m_player1 &&
+            m_player1->getPositionX() < 30.f) {
             return;
         }
         log::info(
