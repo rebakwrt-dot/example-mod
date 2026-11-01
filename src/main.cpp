@@ -65,6 +65,7 @@ namespace {
         PlayerCheckpoint* cp = nullptr;
         CCPoint pos;
         std::vector<uint8_t> flags;
+        bool onGround = false;
         decltype(PlayerObject::m_holdingButtons) hb;
     };
 }
@@ -92,7 +93,7 @@ class $modify(BotLayer, PlayLayer) {
 
         // отладка
         int dbgTicks = 0, dbgReplans = 0, dbgPresses = 0, dbgT = -1, dbgN = 0;
-        float dbgBaseDx = 0.f, dbgRestoreErr = 0.f, dbgStartX = 0.f, dbgEndX = 0.f, dbgEndY = 0.f, dbgSpeed = 0.f;
+        float dbgBaseDx = 0.f, dbgRestoreErr = 0.f, dbgStartX = 0.f, dbgEndX = 0.f, dbgEndY = 0.f, dbgSpeed = 0.f, dbgMaxY = 0.f, dbgJump = 0.f, dbgStartY0 = 0.f;
         std::string dbgSkip;
         Ref<CCLabelBMFont> dbgLabel;
 
@@ -181,6 +182,7 @@ class $modify(BotLayer, PlayLayer) {
         p->saveToCheckpoint(s.cp);
         s.pos = p->getPosition();
         s.hb = p->m_holdingButtons;
+        s.onGround = p->m_isOnGround;
         s.flags.resize(f->win.size());
         for (size_t i = 0; i < f->win.size(); ++i) {
             s.flags[i] = f->win[i]->m_isActivated;
@@ -193,6 +195,7 @@ class $modify(BotLayer, PlayLayer) {
         PlayerObject* g = f->ghost;
         g->loadFromCheckpoint(s.cp);
         g->m_holdingButtons = s.hb;
+        g->m_isOnGround = s.onGround;
         for (size_t i = 0; i < f->win.size() && i < s.flags.size(); ++i) {
             f->win[i]->m_isActivated = s.flags[i] != 0;
         }
@@ -204,6 +207,8 @@ class $modify(BotLayer, PlayLayer) {
         f->dbgStartX = g->getPositionX();
         f->dbgEndX = f->dbgStartX;
         f->dbgEndY = g->getPositionY();
+        f->dbgStartY0 = f->dbgEndY;
+        f->dbgMaxY = f->dbgEndY;
         f->dbgSpeed = g->m_playerSpeed;
         f->dbgRestoreErr = std::hypot(g->getPositionX() - s.pos.x, g->getPositionY() - s.pos.y);
     }
@@ -233,12 +238,14 @@ class $modify(BotLayer, PlayLayer) {
                 g->update(f->subDt);
                 // Если update не двигает призрака вперёд — двигаем сами.
                 float expect = speedUnits(g->m_playerSpeed) * f->subDt;
-                if (g->getPositionX() - x0 < expect * 0.5f) {
+                float moved = g->getPositionX() - x0;
+                if (moved < expect * 0.7f || moved > expect * 1.3f) {
                     g->setPosition(ccp(x0 + expect, g->getPositionY()));
                 }
                 this->checkCollisions(g, f->subDt, false);
                 f->dbgEndX = g->getPositionX();
                 f->dbgEndY = g->getPositionY();
+                f->dbgMaxY = std::max(f->dbgMaxY, f->dbgEndY);
                 if (g_simDead || g->m_isDead) return i;
             }
             f->budget -= f->subs;
@@ -331,6 +338,10 @@ class $modify(BotLayer, PlayLayer) {
         auto f = m_fields.self();
         this->botEnsureGhost();
         f->dbgReplans++;
+        // Нажатия призрака не должны попадать в статистику прыжков.
+        auto gsm = GameStatsManager::sharedState();
+        int st1 = gsm->getStat("1");
+        int st2 = gsm->getStat("2");
         f->used = 0;
         f->budget = (int)Mod::get()->getSettingValue<int64_t>("max_steps");
         this->botBuildWindow(horizon);
@@ -346,9 +357,18 @@ class $modify(BotLayer, PlayLayer) {
         f->trace.clear();
         for (auto& s : rec) f->trace.push_back(s.pos);
 
+        // Самотест: умеет ли призрак прыгать (держим кнопку 15 кадров с нуля).
+        if (f->dbgReplans <= 300) {
+            f->budget = 15 * f->subs + 64;
+            this->botRun(root, false, 15, [](int) { return true; }, nullptr);
+            f->dbgJump = f->dbgMaxY - f->dbgStartY0;
+        }
+
         f->plan = std::move(plan);
         f->planPos = 0;
         f->used = 0;
+        gsm->setStat("1", st1);
+        gsm->setStat("2", st2);
     }
 
     void botUpdateLabel() {
@@ -367,9 +387,9 @@ class $modify(BotLayer, PlayLayer) {
         }
         f->dbgLabel->setVisible(true);
         std::string txt = fmt::format(
-            "tick {} replan {} press {}\nT {}/{} dx {:.0f} rerr {:.1f} spd {:.2f}\nbarrier {} skip {}",
+            "tick {} replan {} press {}\nT {}/{} dx {:.0f} rerr {:.1f} spd {:.2f} jy {:.0f}\nbarrier {} skip {}",
             f->dbgTicks, f->dbgReplans, f->dbgPresses, f->dbgT, f->dbgN, f->dbgBaseDx,
-            f->dbgRestoreErr, f->dbgSpeed, f->barrierX > 1e8f ? -1.f : f->barrierX, f->dbgSkip);
+            f->dbgRestoreErr, f->dbgSpeed, f->dbgJump, f->barrierX > 1e8f ? -1.f : f->barrierX, f->dbgSkip);
         f->dbgLabel->setString(txt.c_str());
     }
 
