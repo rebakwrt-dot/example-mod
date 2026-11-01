@@ -153,7 +153,7 @@ class $modify(BotLayer, PlayLayer) {
         for (; it != f->cache.end() && (*it)->getPositionX() <= hi; ++it) {
             GameObject* o = *it;
             f->win.push_back(o);
-            if (isBarrier(o) && !o->m_hasBeenActivated && o->getPositionX() > px - 10.f) {
+            if (isBarrier(o) && !o->m_isActivated && o->getPositionX() > px - 10.f) {
                 f->barrierX = std::min(f->barrierX, o->getPositionX() - 25.f);
             }
         }
@@ -166,10 +166,9 @@ class $modify(BotLayer, PlayLayer) {
         p->saveToCheckpoint(s.cp);
         s.pos = p->getPosition();
         s.hb = p->m_holdingButtons;
-        s.flags.resize(f->win.size() * 2);
+        s.flags.resize(f->win.size());
         for (size_t i = 0; i < f->win.size(); ++i) {
-            s.flags[2 * i] = f->win[i]->m_hasBeenActivated;
-            s.flags[2 * i + 1] = f->win[i]->m_hasBeenActivatedP2;
+            s.flags[i] = f->win[i]->m_isActivated;
         }
         return s;
     }
@@ -179,9 +178,8 @@ class $modify(BotLayer, PlayLayer) {
         PlayerObject* g = f->ghost;
         g->loadFromCheckpoint(s.cp);
         g->m_holdingButtons = s.hb;
-        for (size_t i = 0; i < f->win.size() && 2 * i + 1 < s.flags.size(); ++i) {
-            f->win[i]->m_hasBeenActivated = s.flags[2 * i] != 0;
-            f->win[i]->m_hasBeenActivatedP2 = s.flags[2 * i + 1] != 0;
+        for (size_t i = 0; i < f->win.size() && i < s.flags.size(); ++i) {
+            f->win[i]->m_isActivated = s.flags[i] != 0;
         }
         // Пересобрать список касаемых орбов (checkpoint его не хранит).
         g_simDead = false;
