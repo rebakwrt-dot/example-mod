@@ -134,7 +134,7 @@ protected:
         if (prompt.empty()) return;
 
         auto url = Mod::get()->getSettingValue<std::string>("api-url");
-        if (url.empty()) {
+        if (url.empty() || url == "offline") {
             place(offlineGenerate(prompt));
             return;
         }
