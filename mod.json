@@ -4,37 +4,29 @@
 		"android": "2.2081",
 		"win": "2.2081"
 	},
-	"id": "user.simplebot",
-	"name": "Simple Bot",
-	"version": "v0.2.3",
+	"id": "user.ghostreplay",
+	"name": "Ghost Replay",
+	"version": "v1.0.0",
 	"developer": "user",
-	"description": "Бот-автопроходчик: заглядывает вперёд движком игры (призрак-игрок) и подбирает безопасную последовательность нажатий. Все режимы, орбы, пады, гравитация.",
-	"tags": ["cheat", "utility"],
+	"description": "После смерти на следующей попытке появляется призрак, который повторяет предыдущую (неудачную) попытку. Максимум один призрак на экране.",
+	"tags": ["gameplay", "enhancement"],
 	"settings": {
 		"enabled": {
 			"type": "bool",
-			"name": "Включить бота",
+			"name": "Включить призрака",
 			"default": true
 		},
-		"debug": {
-			"type": "bool",
-			"name": "Отладочная надпись",
-			"default": true
+		"opacity": {
+			"type": "float",
+			"name": "Прозрачность призрака",
+			"default": 0.45,
+			"min": 0.1,
+			"max": 1.0
 		},
-		"horizon": {
-			"type": "int",
-			"name": "Глубина симуляции (кадров)",
-			"default": 60,
-			"min": 20,
-			"max": 240
-		},
-		"max_steps": {
-			"type": "int",
-			"name": "Лимит шагов симуляции на планирование",
-			"description": "Больше = умнее, но сильнее нагрузка на планировании.",
-			"default": 8000,
-			"min": 1000,
-			"max": 60000
+		"ghost_color": {
+			"type": "color",
+			"name": "Цвет призрака",
+			"default": "#7FD4FF"
 		}
 	}
 }
