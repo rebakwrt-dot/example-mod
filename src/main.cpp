@@ -60,15 +60,21 @@ class $modify(ADLayer, PlayLayer) {
         }
     }
 
-    // Diagnostic: logs who died and from what.
+    // The game keeps a hidden "anti-cheat" spike (object id 8) at (0, 105).
+    // At level start both players overlap it, so it kills them instantly.
+    // Ignore only that spike; everything else works as normal.
     void destroyPlayer(PlayerObject* player, GameObject* object) {
+        if (modOn() && object && object->m_objectID == 8 &&
+            object->getPositionX() < 1.f &&
+            std::abs(object->getPositionY() - 105.f) < 1.f) {
+            return;
+        }
         log::info(
-            "[AlwaysDual] death: {} | object: {} | P1=({:.0f},{:.0f}) P2=({:.0f},{:.0f}) | gravity P1={} P2={}",
+            "[AlwaysDual] death: {} | object: {} | P1=({:.0f},{:.0f}) P2=({:.0f},{:.0f})",
             player == m_player2 ? "P2" : "P1",
             object ? fmt::format("id {} at ({:.0f},{:.0f})", object->m_objectID, object->getPositionX(), object->getPositionY()) : std::string("none (bounds/ground)"),
             m_player1->getPositionX(), m_player1->getPositionY(),
-            m_player2->getPositionX(), m_player2->getPositionY(),
-            m_player1->m_isUpsideDown, m_player2->m_isUpsideDown
+            m_player2->getPositionX(), m_player2->getPositionY()
         );
         PlayLayer::destroyPlayer(player, object);
     }
