@@ -6,7 +6,7 @@
 		"mac": "2.2081",
 		"ios": "2.2081"
 	},
-	"version": "v1.1.5",
+	"version": "v1.1.6",
 	"id": "yourname.always-dual",
 	"name": "Always Dual",
 	"developer": "yourname",
@@ -25,6 +25,12 @@
 			"type": "bool",
 			"name": "Remove Dual Ceiling",
 			"description": "Hides the extra ceiling that appears in dual mode.",
+			"default": true
+		},
+		"split-controls": {
+			"type": "bool",
+			"name": "Separate Controls",
+			"description": "Left half of the screen controls Player 1, right half controls Player 2.",
 			"default": true
 		}
 	}
