@@ -4,12 +4,12 @@
 
 using namespace geode::prelude;
 
-static bool modOn() {
-    return Mod::get()->getSettingValue<bool>("enabled");
-}
+static bool modOn() { return Mod::get()->getSettingValue<bool>("enabled"); }
 
-// Makes P2 run on the SAME lane as P1: same gravity (not mirrored),
-// same height (not in the floor/ceiling), shifted forward by the offset.
+// P2 is placed one frame AFTER dual is enabled, so the game has
+// finished its own setup of P2 first.
+static bool g_placeP2 = false;
+
 static void syncP2(GJBaseGameLayer* layer, bool place) {
     auto p1 = layer->m_player1;
     auto p2 = layer->m_player2;
@@ -29,7 +29,7 @@ static void syncP2(GJBaseGameLayer* layer, bool place) {
 class $modify(ADBase, GJBaseGameLayer) {
     void toggleDualMode(GameObject* portal, bool enable, PlayerObject* player, bool noEffects) {
         GJBaseGameLayer::toggleDualMode(portal, enable, player, noEffects);
-        if (enable && modOn()) syncP2(this, true);
+        if (enable && modOn()) g_placeP2 = true;
     }
 };
 
@@ -42,26 +42,34 @@ class $modify(ADLayer, PlayLayer) {
         }
     }
 
-    void hideCeiling() {
-        if (!Mod::get()->getSettingValue<bool>("hide-ceiling")) return;
-        if (m_groundLayer2) m_groundLayer2->setVisible(false);
-    }
-
     void setupHasCompleted() {
         PlayLayer::setupHasCompleted();
         this->forceDual();
-        this->hideCeiling();
     }
 
     void resetLevel() {
         PlayLayer::resetLevel();
         this->forceDual();
-        this->hideCeiling();
     }
 
     void postUpdate(float dt) {
         PlayLayer::postUpdate(dt);
-        if (modOn() && m_gameState.m_isDualMode) syncP2(this, false);
-        this->hideCeiling();
+        if (modOn() && m_gameState.m_isDualMode) {
+            syncP2(this, g_placeP2);
+            g_placeP2 = false;
+        }
+    }
+
+    // Diagnostic: logs who died and from what.
+    void destroyPlayer(PlayerObject* player, GameObject* object) {
+        log::info(
+            "[AlwaysDual] death: {} | object: {} | P1=({:.0f},{:.0f}) P2=({:.0f},{:.0f}) | gravity P1={} P2={}",
+            player == m_player2 ? "P2" : "P1",
+            object ? fmt::format("id {} at ({:.0f},{:.0f})", object->m_objectID, object->getPositionX(), object->getPositionY()) : std::string("none (bounds/ground)"),
+            m_player1->getPositionX(), m_player1->getPositionY(),
+            m_player2->getPositionX(), m_player2->getPositionY(),
+            m_player1->m_isUpsideDown, m_player2->m_isUpsideDown
+        );
+        PlayLayer::destroyPlayer(player, object);
     }
 };
