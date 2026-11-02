@@ -43,10 +43,20 @@ class $modify(ADLayer, PlayLayer) {
         this->hideCeiling();
     }
 
+    // Ball, spider and swing copter flip gravity on their own, so P1 and P2
+    // may differ there. In every other mode P2 follows P1's gravity.
+    static bool ownGravity(PlayerObject* p) {
+        return p->m_isBall || p->m_isSpider || p->m_isSwing;
+    }
+
     void postUpdate(float dt) {
         PlayLayer::postUpdate(dt);
-        // No gravity syncing: each player keeps its own gravity
-        // (ball, spider and swing need P2 to flip independently of P1).
+        if (modOn() && m_gameState.m_isDualMode && m_player1 && m_player2 &&
+            !ownGravity(m_player1) && !ownGravity(m_player2)) {
+            if (m_player1->m_isUpsideDown != m_player2->m_isUpsideDown) {
+                m_player2->flipGravity(m_player1->m_isUpsideDown, true);
+            }
+        }
         this->hideCeiling();
     }
 
