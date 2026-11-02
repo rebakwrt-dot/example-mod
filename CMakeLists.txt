@@ -11,8 +11,10 @@ if (NOT DEFINED ENV{GEODE_SDK})
 endif()
 add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
 
-# GDR replay format library (verify repo/tag against its README)
-CPMAddPackage("gh:maxnut/GDReplayFormat#main")
-target_link_libraries(${PROJECT_NAME} gdr)
+# GDR replay format library.
+# Default branch is "gdr2" (there is no "main"). For reproducible builds,
+# replace "gdr2" with a specific commit hash, as the README recommends.
+CPMAddPackage("gh:maxnut/GDReplayFormat#gdr2")
+target_link_libraries(${PROJECT_NAME} libGDR)
 
 setup_geode_mod(${PROJECT_NAME})
