@@ -7,6 +7,9 @@ static bool modOn() {
     return Mod::get()->getSettingValue<bool>("enabled");
 }
 
+static int g_sig1 = 0;
+static int g_sig2 = 0;
+
 class $modify(ADLayer, PlayLayer) {
     // Use the game's own "Start Dual" level flag. The game then sets up
     // P2 AND the ground/ceiling correctly during its normal level reset
@@ -39,22 +42,32 @@ class $modify(ADLayer, PlayLayer) {
     void resetLevel() {
         this->forceDual();
         PlayLayer::resetLevel();
+        g_sig1 = 0;
+        g_sig2 = 0;
         this->splitControls();
         this->hideCeiling();
     }
 
-    // Ball, spider and swing copter flip gravity on their own, so P1 and P2
-    // may differ there. In every other mode P2 follows P1's gravity.
-    static bool ownGravity(PlayerObject* p) {
-        return p->m_isBall || p->m_isSpider || p->m_isSwing;
+    // Ball, spider and swing copter: when a player ENTERS such a mode, P2 gets
+    // P1's gravity once; after that each player can flip its own gravity.
+    // In every other mode P2 always follows P1's gravity.
+    static int modeSig(PlayerObject* p) {
+        return (p->m_isBall ? 1 : 0) | (p->m_isSpider ? 2 : 0) | (p->m_isSwing ? 4 : 0);
     }
 
     void postUpdate(float dt) {
         PlayLayer::postUpdate(dt);
-        if (modOn() && m_gameState.m_isDualMode && m_player1 && m_player2 &&
-            !ownGravity(m_player1) && !ownGravity(m_player2)) {
-            if (m_player1->m_isUpsideDown != m_player2->m_isUpsideDown) {
-                m_player2->flipGravity(m_player1->m_isUpsideDown, true);
+        if (modOn() && m_gameState.m_isDualMode && m_player1 && m_player2) {
+            int s1 = modeSig(m_player1);
+            int s2 = modeSig(m_player2);
+            bool special = s1 != 0 || s2 != 0;
+            bool entered = (s1 != g_sig1) || (s2 != g_sig2);
+            g_sig1 = s1;
+            g_sig2 = s2;
+            if (!special || entered) {
+                if (m_player1->m_isUpsideDown != m_player2->m_isUpsideDown) {
+                    m_player2->flipGravity(m_player1->m_isUpsideDown, true);
+                }
             }
         }
         this->hideCeiling();
