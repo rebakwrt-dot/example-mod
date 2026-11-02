@@ -7,9 +7,6 @@ static bool modOn() {
     return Mod::get()->getSettingValue<bool>("enabled");
 }
 
-static int g_frame = 0;
-static int g_lines = 0;
-
 class $modify(ADLayer, PlayLayer) {
     // Use the game's own "Start Dual" level flag. The game then sets up
     // P2 AND the ground/ceiling correctly during its normal level reset
@@ -42,44 +39,23 @@ class $modify(ADLayer, PlayLayer) {
     void resetLevel() {
         this->forceDual();
         PlayLayer::resetLevel();
-        g_frame = 0;
-        g_lines = 0;
         this->splitControls();
         this->hideCeiling();
     }
 
     void postUpdate(float dt) {
         PlayLayer::postUpdate(dt);
-        if (modOn() && m_gameState.m_isDualMode && m_player1 && m_player2) {
-            // P2 always keeps the same gravity as P1 (same lane, not mirrored)
-            if (m_player1->m_isUpsideDown != m_player2->m_isUpsideDown) {
-                m_player2->flipGravity(m_player1->m_isUpsideDown, true);
-            }
-        }
+        // No gravity syncing: each player keeps its own gravity
+        // (ball, spider and swing need P2 to flip independently of P1).
         this->hideCeiling();
-
-        // Diagnostic: where exactly are both players during the first seconds
-        if (modOn() && m_gameState.m_isDualMode && m_player1 && m_player2) {
-            g_frame++;
-            if (g_frame % 15 == 0 && g_lines < 14) {
-                g_lines++;
-                log::info(
-                    "[AlwaysDual] pos: P1=({:.1f},{:.1f}) up={} | P2=({:.1f},{:.1f}) up={} vis={}",
-                    m_player1->getPositionX(), m_player1->getPositionY(), m_player1->m_isUpsideDown,
-                    m_player2->getPositionX(), m_player2->getPositionY(), m_player2->m_isUpsideDown,
-                    m_player2->isVisible()
-                );
-            }
-        }
     }
 
-    // Logs showed both players dying in the first frames after spawn
-    // (x < 20) from a hidden spike (id 8) or from "no object".
-    // No real level object can be there, so ignore deaths at the very start.
     void destroyPlayer(PlayerObject* player, GameObject* object) {
-        if (modOn() && m_gameState.m_isDualMode && m_player1 &&
-            m_player1->getPositionX() < 30.f) {
-            return;
+        if (modOn() && m_gameState.m_isDualMode && m_player1) {
+            // Deaths right after spawn (hidden start spike / no object)
+            if (m_player1->getPositionX() < 30.f) return;
+            // The invisible dual ceiling: a "no object" death high above the floor
+            if (!object && player && player->getPositionY() > 150.f) return;
         }
         log::info(
             "[AlwaysDual] death: {} | object: {} | P1=({:.0f},{:.0f}) P2=({:.0f},{:.0f})",
