@@ -1,11 +1,18 @@
 cmake_minimum_required(VERSION 3.21)
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-project(AlwaysDual VERSION 1.1.0)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+project(AutoMacro VERSION 0.1.0)
+
 file(GLOB SOURCES src/*.cpp)
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
+
 if (NOT DEFINED ENV{GEODE_SDK})
-    message(FATAL_ERROR "Unable to find Geode SDK! Please define GEODE_SDK")
+    message(FATAL_ERROR "Unable to find Geode SDK! Define GEODE_SDK env variable.")
 endif()
 add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
+
+# GDR replay format library (verify repo/tag against its README)
+CPMAddPackage("gh:maxnut/GDReplayFormat#main")
+target_link_libraries(${PROJECT_NAME} gdr)
+
 setup_geode_mod(${PROJECT_NAME})
