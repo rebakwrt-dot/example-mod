@@ -77,8 +77,7 @@ class $modify(AMPlayLayer, PlayLayer) {
     void setHold(bool down, bool record) {
         if (down == g_holding) return;
         g_holding = down;
-        if (down) this->pushButton(static_cast<int>(PlayerButton::Jump), true);
-        else      this->releaseButton(static_cast<int>(PlayerButton::Jump), true);
+        this->handleButton(down, static_cast<int>(PlayerButton::Jump), true);
         if (record) {
             g_replay.inputs.emplace_back(
                 static_cast<uint64_t>(m_fields->frame + 1),
@@ -101,8 +100,7 @@ class $modify(AMPlayLayer, PlayLayer) {
             // direct button calls without recording
             if (h != g_holding) {
                 g_holding = h;
-                if (h) this->pushButton(static_cast<int>(PlayerButton::Jump), true);
-                else   this->releaseButton(static_cast<int>(PlayerButton::Jump), true);
+                this->handleButton(h, static_cast<int>(PlayerButton::Jump), true);
             }
             stepOnce();
             if (g_dead) { b.dead = true; break; }
